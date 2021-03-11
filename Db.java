@@ -3,10 +3,12 @@ package banking;
 import java.sql.*;
 
 public class Db {
+    String dbPath;
     Connection conn;
 
 
-    public Db() {
+    public Db(String dbPath) {
+        this.dbPath = dbPath;
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
@@ -15,7 +17,7 @@ public class Db {
     }
 
 
-    void connect(String dbPath) throws SQLException {
+    void connect() throws SQLException {
         try {
             conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
             try (Statement statement = conn.createStatement()) {
@@ -46,13 +48,13 @@ public class Db {
     }
 
     void saveAccount(Account account) throws SQLException {
+        connect();
         Statement statement = null;
         try {
             statement = conn.createStatement();
             String sql = new StringBuilder("insert into card(number, pin, balance) values ('")
                     .append(account.getCardNumber()).append("','")
-//                    .append(account.getPinCode()).append("',")
-                    .append(account.getOriginalPinCode()).append("',")
+                    .append(account.getPinCode()).append("',")
                     .append(account.getBalance())
                     .append(");").toString();
             statement.executeUpdate(sql);
@@ -61,11 +63,13 @@ public class Db {
                 statement.close();
             }
         }
+        disconnect();
     }
 
-    Account findAccount(String cardNumber) throws SQLException {
+    Account findAccount(String cardNumber) {
         Statement statement = null;
         try {
+            connect();
             statement = conn.createStatement();
             try (ResultSet user = statement.executeQuery(new StringBuilder("select * from card where number = ")
                     .append(cardNumber).append(" limit 1;").toString())) {
@@ -73,41 +77,43 @@ public class Db {
                     Account account = new Account();
                     account.setId(user.getInt("id"));
                     account.setCardNumber(user.getString("number"));
-//                    account.setPinCode(user.getString("pin"));
-                    account.setOriginalPinCode(user.getString("pin"));
+                    account.setPinCode(user.getString("pin"));
                     account.setBalance(user.getInt("balance"));
                     return account;
                 }
             }
 
-        } finally {
-            if (statement != null) {
-                statement.close();
-            }
+        } catch (SQLException throwables) {
+            return null;
         }
         return null;
     }
 
     void addIncome(Account account, int value) {
         String sql = "UPDATE card SET balance = balance + ? WHERE id = ?";
-
-        try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+        try {
+            connect();
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
             preparedStatement.setInt(1, value);
             preparedStatement.setInt(2, account.getId());
 
             preparedStatement.executeUpdate();
+            disconnect();
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
     }
 
-    int getBalanceByCardID(int cardId) {
+    int getBalanceByCardID(int cardId) throws SQLException {
         String sql = "SELECT balance FROM card WHERE id = ?";
         int curBalance = 0;
-        try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+        try {
+            connect();
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
             preparedStatement.setInt(1, cardId);
             ResultSet res = preparedStatement.executeQuery();
             curBalance = res.getInt("balance");
+            disconnect();
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
@@ -118,6 +124,7 @@ public class Db {
         String updateSenderBalance = "UPDATE card SET balance = balance - ? WHERE id = ?";
         String updateRecipientBalance = "UPDATE card SET balance = balance + ? WHERE id = ?";
         try {
+            connect();
             conn.setAutoCommit(false);
             PreparedStatement send = conn.prepareStatement(updateSenderBalance);
             PreparedStatement receive = conn.prepareStatement(updateRecipientBalance);
@@ -131,6 +138,7 @@ public class Db {
             receive.executeUpdate();
 
             conn.commit();
+            disconnect();
             System.out.println("Success!");
 
         } catch (SQLException throwables) {
@@ -142,9 +150,11 @@ public class Db {
         String delAccountSql = "DELETE FROM card WHERE id = ?";
         PreparedStatement delAccount = null;
         try {
+            connect();
             delAccount = conn.prepareStatement(delAccountSql);
             delAccount.setInt(1, account.getId());
             delAccount.executeUpdate();
+            disconnect();
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }

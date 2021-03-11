@@ -83,15 +83,12 @@ public class Account {
     }
 
     public void authorization(String pin) {
-//        try {
-//            if (Password.check(pin, this.pinCode)) {
-//                this.isAuthorized = true;
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-        if (this.originalPinCode.equals(pin)) {
-            this.isAuthorized = true;
+        try {
+            if (Password.check(pin, this.pinCode)) {
+                this.isAuthorized = true;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

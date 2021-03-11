@@ -4,21 +4,48 @@ import java.sql.SQLException;
 
 public class Validator {
     Account account;
-    String dbPath;
+    Db db;
 
-    public Validator(Account account, String dbPath) {
+    public Validator(Account account, Db db) {
         this.account = account;
-        this.dbPath = dbPath;
+        this.db = db;
+    }
+
+    public Validator(Db db) {
+        this.db = db;
+    }
+
+    public void setAccount(Account account) {
+        this.account = account;
     }
 
     public boolean checkTransferRecipient(String recCardNumber) {
+        if (account == null) {
+            System.out.println("account not set");
+            return true;
+        }
         if (account.getCardNumber().equals(recCardNumber)) {
             System.out.println(ErrorCodes.e0002.getDescription() + "\n");
             return true;
         }
-        int[] cardDigits = new int[recCardNumber.length()];
-        for (int i = 0; i < recCardNumber.length(); i++) {
-            cardDigits[i] = Integer.parseInt(recCardNumber.substring(i, i + 1));
+        if (!isLuhnAlgorithm(recCardNumber)) {
+            System.out.println(ErrorCodes.e0003.getDescription() + "\n");
+            return true;
+        }
+        Account recipient = new Account();
+        recipient = db.findAccount(recCardNumber);
+        if (recipient == null) {
+            System.out.println(ErrorCodes.e0004.getDescription() + "\n");
+            return true;
+        }
+
+        return false;
+    }
+
+    public boolean isLuhnAlgorithm(String cardNumber) {
+        int[] cardDigits = new int[cardNumber.length()];
+        for (int i = 0; i < cardNumber.length(); i++) {
+            cardDigits[i] = Integer.parseInt(cardNumber.substring(i, i + 1));
         }
         for (int i = cardDigits.length - 2; i >= 0; i = i - 2) {
             int j = cardDigits[i];
@@ -33,32 +60,14 @@ public class Validator {
             sum += cardDigits[i];
         }
         if (sum % 10 != 0) {
-            System.out.println(ErrorCodes.e0003.getDescription() + "\n");
-            return true;
+            return false;
         }
-        Db db = new Db();
-        Account recipient = new Account();
-        try {
-            db.connect(dbPath);
-            recipient = db.findAccount(recCardNumber);
-            db.disconnect();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        }
-        if (recipient == null) {
-            System.out.println(ErrorCodes.e0004.getDescription() + "\n");
-            return true;
-        }
-
-        return false;
+        return true;
     }
 
     public boolean checkTransferValue(int transferValue) {
-        Db db = new Db();
         try {
-            db.connect(dbPath);
             account.setBalance(db.getBalanceByCardID(account.getId()));
-            db.disconnect();
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
